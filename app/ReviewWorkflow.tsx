@@ -127,7 +127,19 @@ export default function ReviewWorkflow() {
           </div>
 
           <button className="run-button" type="button" onClick={run} disabled={running || !reviewText.trim()}>
-            <span>{running ? `Running agent ${Math.min(completed + 1, 4)} of 4…` : finished ? "Replay workflow" : "Run 4-step workflow"}</span><b>{running ? "•••" : "→"}</b>
+            <span>{running ? `Running agent ${Math.min(completed + 1, 4)} of 4…` : finished ? "Replay workflow" : "Run 4-step workflow"}</span>
+            <span className="run-icon" aria-hidden="true">
+              {running ? (
+                <svg className="run-loader" viewBox="0 0 24 24">
+                  <circle className="loader-track" cx="12" cy="12" r="8" />
+                  <path className="loader-head" d="M12 4a8 8 0 0 1 8 8" />
+                </svg>
+              ) : (
+                <svg className="run-arrow" viewBox="0 0 24 24">
+                  <path d="M5 12h13M13 7l5 5-5 5" />
+                </svg>
+              )}
+            </span>
           </button>
           <p className="run-note" id="review-edit-note">Choose an example or paste Korean · no auto-publish</p>
 
