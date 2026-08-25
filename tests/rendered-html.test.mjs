@@ -25,6 +25,9 @@ test("server-renders the task-specific review workflow", async () => {
   assert.match(html, /Publish Gate/);
   assert.match(html, /Editable Korean source/);
   assert.match(html, /Eye surgery/);
+  assert.match(html, /Edit review/);
+  assert.match(html, /Trust audit/);
+  assert.doesNotMatch(html, /href="#workflow">Procedures/);
   assert.doesNotMatch(html, /Review passport · #GBG-0241/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/);
 });

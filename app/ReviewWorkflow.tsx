@@ -57,13 +57,25 @@ export default function ReviewWorkflow() {
     setShowOriginal(false);
   }
 
+  function inspect(step: StepId) {
+    setSelected(step);
+    const target = step === "source" ? document.getElementById("korean-review") : document.getElementById("handoff-inspector");
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (step === "source") window.setTimeout(() => (target as HTMLTextAreaElement | null)?.focus(), 250);
+  }
+
   const activeEvent = events[selected];
 
   return (
     <main>
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Gangnam Beauty Guide home"><span>gangnam beauty guide<b>.</b></span></a>
-        <nav className="main-nav" aria-label="Primary navigation"><a href="#workflow">Procedures</a><a href="#workflow">Find a clinic</a><a href="#workflow">Reviews</a><a href="#workflow">Safety</a></nav>
+        <nav className="main-nav" aria-label="Workflow navigation">
+          <button className={selected === "source" ? "active" : ""} type="button" onClick={() => inspect("source")} aria-pressed={selected === "source"}>Edit review</button>
+          <button className={selected === "normalize" ? "active" : ""} type="button" onClick={() => inspect("normalize")} aria-pressed={selected === "normalize"}>Normalize</button>
+          <button className={selected === "audit" ? "active" : ""} type="button" onClick={() => inspect("audit")} aria-pressed={selected === "audit"}>Trust audit</button>
+          <button className={selected === "publish" ? "active" : ""} type="button" onClick={() => inspect("publish")} aria-pressed={selected === "publish"}>Publish gate</button>
+        </nav>
         <div className="header-actions"><span className="live-dot" />Agent Lab <button type="button" onClick={reset}>Reset</button></div>
       </header>
 
@@ -117,7 +129,7 @@ export default function ReviewWorkflow() {
           </div>
 
           <div className="detail-grid">
-            <section className="trace-card">
+            <section className="trace-card" id="handoff-inspector">
               <div className="card-heading"><div><span className="eyebrow">Selected handoff</span><h3>{stepMeta.find((step) => step.id === selected)?.name}</h3></div><span className={`contract-state ${activeEvent.status}`}>{activeEvent.status}</span></div>
               {activeEvent.output ? (
                 <pre>{JSON.stringify(activeEvent.output, null, 2)}</pre>

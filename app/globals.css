@@ -24,8 +24,10 @@ button:disabled { cursor: wait; }
 .brand { color: var(--ink); text-decoration: none; font-family: var(--font-poppins), Arial, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: -.45px; text-transform: lowercase; }
 .brand b { color: var(--rose); font-size: 18px; }
 .main-nav { display: flex; align-items: center; gap: 25px; }
-.main-nav a { color: #333; text-decoration: none; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .45px; }
-.main-nav a:hover { color: var(--rose-dark); }
+.main-nav button { position: relative; padding: 21px 0 19px; border: 0; background: transparent; color: #333; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .45px; }
+.main-nav button::after { content: ""; position: absolute; right: 0; bottom: 0; left: 0; height: 3px; background: var(--rose); transform: scaleX(0); transition: transform .16s ease; }
+.main-nav button:hover, .main-nav button.active { color: var(--rose-dark); }
+.main-nav button.active::after { transform: scaleX(1); }
 .header-actions { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
 .header-actions { justify-self: end; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .45px; }
 .header-actions button { margin-left: 8px; border: 1px solid #cfcfcf; background: white; padding: 7px 11px; border-radius: 3px; color: var(--ink); font-size: 9px; font-weight: 700; text-transform: uppercase; }
