@@ -11,16 +11,20 @@ export type WorkflowEvent = {
 
 export const reviewExamples = [
   {
-    label: "Eye surgery",
+    label: "Unit bug",
     raw: "엘리트성형외과에서 자연유착 쌍꺼풀 했어요. 상담해주신 김원장님이 과하게 권하지 않아서 좋았고 350만원 들었어요. 붓기는 2주 정도 갔고 지금은 자연스러워요.",
   },
   {
-    label: "Laser",
+    label: "Clean laser",
     raw: "서울피부과에서 피코 레이저 받았어요. 상담은 친절했고 45만원 들었어요. 회복은 3일 정도였고 잡티가 많이 옅어졌어요.",
   },
   {
-    label: "Filler",
-    raw: "강남미인의원에서 입술 필러 했어요. 박원장님이 모양을 꼼꼼히 봐주셨고 38만원이었어요. 멍은 5일 정도 갔어요.",
+    label: "Near duplicate",
+    raw: "강남미인의원에서 입술 필러 했어요. 박원장님이 모양을 꼼꼼하게 봐주셨고 38만원이었어요. 멍은 5일 정도 갔어요.",
+  },
+  {
+    label: "Policy risk",
+    raw: "협찬으로 강남미인의원에서 입술 필러 했어요. 자세한 상담은 010-1234-5678로 연락하세요. 비용은 38만원이었어요.",
   },
 ] as const;
 
@@ -44,6 +48,28 @@ const procedureIndex = [
   { ko: "피부관리", label: "Skin treatment", taxonomyId: "skin.care" },
 ];
 
+const knownReviewCorpus = [
+  {
+    id: "GBG-0198",
+    raw: "강남미인의원에서 입술 필러 했어요. 박원장님이 모양을 꼼꼼히 봐주셨고 38만원이었어요. 멍은 5일 정도 갔어요.",
+  },
+];
+
+function normalizedShingles(value: string) {
+  const normalized = value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  const shingles = new Set<string>();
+  for (let index = 0; index <= normalized.length - 3; index += 1) shingles.add(normalized.slice(index, index + 3));
+  return shingles;
+}
+
+function similarity(left: string, right: string) {
+  const a = normalizedShingles(left);
+  const b = normalizedShingles(right);
+  const intersection = [...a].filter((value) => b.has(value)).length;
+  const union = new Set([...a, ...b]).size;
+  return union ? intersection / union : 0;
+}
+
 async function digest(raw: string) {
   const bytes = new TextEncoder().encode(raw);
   const hash = await crypto.subtle.digest("SHA-256", bytes);
@@ -56,7 +82,9 @@ function extractEvidence(raw: string) {
   const surgeon = raw.match(/([가-힣]{1,4}(?:원장님|선생님|의사))/)?.[1] ?? null;
   const priceRaw = raw.match(/\d[\d,.]*\s*(?:만\s*원|만원|원)/)?.[0]?.replace(/\s/g, "") ?? null;
   const recoveryRaw = raw.match(/(?:붓기|회복|멍)[^.!?。]{0,12}?\d+(?:\.\d+)?\s*(?:일|주|개월)(?:\s*정도)?/)?.[0]?.trim() ?? null;
-  return { clinic, procedure, surgeon, priceRaw, recoveryRaw };
+  const piiSpans = raw.match(/01[016789]-?\d{3,4}-?\d{4}|(?:카톡|카카오톡|Kakao)\s*(?:ID|아이디)?\s*[:：]?\s*[A-Za-z0-9_.-]{3,}/gi) ?? [];
+  const sponsorshipTerms = ["협찬", "광고", "제공받아", "원고료"].filter((term) => raw.includes(term));
+  return { clinic, procedure, surgeon, priceRaw, recoveryRaw, piiSpans, sponsorshipTerms };
 }
 
 async function sourceScout(raw: string) {
@@ -69,6 +97,11 @@ async function sourceScout(raw: string) {
     source_url: incomingReview.sourceUrl,
     original_korean: raw,
     immutable_snapshot: `sha256:${snapshotSha}`,
+    ingest_contract: {
+      schema: "review.source.v1",
+      idempotency_key: `${incomingReview.sourceUrl}#${snapshotSha.slice(0, 16)}`,
+      delivery: "at-least-once safe",
+    },
     evidence_spans: {
       clinic: extracted.clinic,
       procedure: extracted.procedure?.ko ?? null,
@@ -76,7 +109,11 @@ async function sourceScout(raw: string) {
       price_raw: extracted.priceRaw,
       recovery_raw: extracted.recoveryRaw,
     },
-    disclosure: "No sponsorship disclosure found",
+    risk_signals: {
+      pii_spans: extracted.piiSpans,
+      sponsorship_terms: extracted.sponsorshipTerms,
+    },
+    disclosure: extracted.sponsorshipTerms.length ? "Commercial relationship language detected" : "No sponsorship disclosure found",
   };
 }
 
@@ -101,11 +138,14 @@ function normalizer(source: Awaited<ReturnType<typeof sourceScout>>) {
     priceRaw ? `reported price ${priceRaw}` : "no price detected",
     source.evidence_spans.recovery_raw ? `recovery note “${source.evidence_spans.recovery_raw}”` : "no recovery duration detected",
   ].join(", ");
+  const safeOriginal = source.risk_signals.pii_spans.reduce((text, span) => text.replace(span, "[CONTACT REDACTED]"), source.original_korean);
 
   return {
     translated_review: isSeed
       ? "I had natural-adhesion double-eyelid surgery at Elite Plastic Surgery. Dr. Kim did not push unnecessary procedures, which I appreciated. It cost ₩3.5 million. Swelling lasted about two weeks and the result now looks natural."
       : `Evidence-led English preview: The review mentions ${evidenceSummary}. A human translator must confirm nuance before publishing.`,
+    safe_original_korean: safeOriginal,
+    redactions: source.risk_signals.pii_spans.map((span) => ({ type: "contact", source_span: span, replacement: "[CONTACT REDACTED]" })),
     clinic_candidates: isSeed
       ? [
           { clinic_id: "kr-seoul-elite-ps-01", name: "Elite Plastic Surgery", source_name: clinicName, confidence: 0.71 },
@@ -125,7 +165,7 @@ function normalizer(source: Awaited<ReturnType<typeof sourceScout>>) {
   };
 }
 
-function audit(normalized: ReturnType<typeof normalizer>) {
+function audit(normalized: ReturnType<typeof normalizer>, source: Awaited<ReturnType<typeof sourceScout>>) {
   const unitMatch = normalized.price_source_span?.match(/([\d,.]+)만(?:원)?/);
   const guardedPrice = unitMatch ? Number(unitMatch[1].replace(/,/g, "")) * 10_000 : normalized.price_candidate_krw;
   const priceRepaired = guardedPrice !== null && normalized.price_candidate_krw !== null && guardedPrice !== normalized.price_candidate_krw;
@@ -133,34 +173,71 @@ function audit(normalized: ReturnType<typeof normalizer>) {
   const surgeonNeedsReview = !normalized.surgeon.verified_id;
   const procedureNeedsReview = !normalized.procedure.taxonomy_id;
   const evidencePoints = [normalized.clinic_candidates.length > 0, normalized.procedure.taxonomy_id, normalized.price_source_span, normalized.recovery_days].filter(Boolean).length;
+  const duplicateCandidates = knownReviewCorpus
+    .map((record) => ({ review_id: record.id, similarity: similarity(source.original_korean, record.raw) }))
+    .sort((left, right) => right.similarity - left.similarity);
+  const topDuplicate = duplicateCandidates[0];
+  // Calibrated so minor Korean adverb/particle edits are quarantined for review.
+  const duplicateThreshold = 0.84;
+  const duplicateFound = topDuplicate.similarity >= duplicateThreshold;
+  const piiFound = source.risk_signals.pii_spans.length > 0;
+  const sponsorshipFound = source.risk_signals.sponsorship_terms.length > 0;
+  const baseTrustScore = normalized.translation_confidence > 0.8 ? 78 : 42 + evidencePoints * 6;
 
   return {
     corrected_price_krw: guardedPrice,
     repairs: priceRepaired
       ? [{ rule: "KRW_MANWON_UNIT", from: normalized.price_candidate_krw, to: guardedPrice, severity: "critical" }]
       : [],
-    duplicate_search: { top_similarity: 0.18, matched_review_id: null, threshold: 0.86 },
+    duplicate_search: {
+      top_similarity: Number(topDuplicate.similarity.toFixed(3)),
+      matched_review_id: duplicateFound ? topDuplicate.review_id : null,
+      threshold: duplicateThreshold,
+      method: "character_trigram_jaccard_v1",
+    },
+    policy_checks: {
+      pii: { status: piiFound ? "redacted_and_blocked" : "pass", spans_found: source.risk_signals.pii_spans.length },
+      sponsorship: { status: sponsorshipFound ? "disclosure_review" : "pass", terms: source.risk_signals.sponsorship_terms },
+      duplicate: { status: duplicateFound ? "quarantine" : "pass" },
+    },
     source_integrity: { snapshot_match: true, evidence_spans_preserved: true },
     entity_resolution: {
       clinic: clinicNeedsReview ? "human_confirmation_required" : "resolved",
       surgeon: surgeonNeedsReview ? "unverified" : "verified",
     },
-    trust_score: normalized.translation_confidence > 0.8 ? 78 : 42 + evidencePoints * 6,
-    publishable: !clinicNeedsReview && !surgeonNeedsReview && !procedureNeedsReview && !priceRepaired,
+    trust_score: Math.max(18, baseTrustScore - (duplicateFound ? 22 : 0) - (piiFound ? 18 : 0) - (sponsorshipFound ? 12 : 0)),
+    publishable: !clinicNeedsReview && !surgeonNeedsReview && !procedureNeedsReview && !priceRepaired && !duplicateFound && !piiFound && !sponsorshipFound,
     blockers: [
       ...(clinicNeedsReview ? ["Clinic match is below the 0.85 auto-link threshold"] : []),
       ...(surgeonNeedsReview ? [`“${normalized.surgeon.display_name}” cannot be tied to a verified surgeon record`] : []),
       ...(procedureNeedsReview ? ["Procedure could not be mapped to the current taxonomy"] : []),
       ...(priceRepaired ? ["Critical price repair requires reviewer acknowledgement"] : []),
+      ...(duplicateFound ? [`Possible duplicate of ${topDuplicate.review_id} exceeds the ${duplicateThreshold} threshold`] : []),
+      ...(piiFound ? ["Contact information was redacted; privacy reviewer acknowledgement required"] : []),
+      ...(sponsorshipFound ? ["Commercial relationship language requires disclosure review"] : []),
       ...(normalized.translation_confidence < 0.8 ? ["Edited input requires human translation review"] : []),
     ],
   };
 }
 
 function publishGate(audited: ReturnType<typeof audit>) {
+  const queues = [
+    ...(audited.repairs.length ? ["price-repair"] : []),
+    ...(audited.duplicate_search.matched_review_id ? ["duplicate-quarantine"] : []),
+    ...(audited.policy_checks.pii.status !== "pass" ? ["privacy-review"] : []),
+    ...(audited.policy_checks.sponsorship.status !== "pass" ? ["disclosure-review"] : []),
+    ...(audited.entity_resolution.clinic !== "resolved" || audited.entity_resolution.surgeon !== "verified" ? ["entity-review"] : []),
+  ];
   return {
     decision: audited.publishable ? "publish" : "hold_for_human",
-    queue: "entity-and-price-review",
+    queues: queues.length ? queues : ["publish-ready"],
+    priority: audited.repairs.length || audited.duplicate_search.matched_review_id || audited.policy_checks.pii.status !== "pass" ? "critical" : "standard",
+    operational_controls: {
+      contract_version: "review.publish.v1",
+      retry_policy: "exponential backoff; max 3 attempts",
+      dead_letter_queue: "review-publish-dlq",
+      human_sla: "critical 4h · standard 24h",
+    },
     immutable_fields: ["source_url", "snapshot_sha", "original_korean", "repair_log"],
     public_badges: ["Source archived", "Procedure evidence found", "Human checked translation"],
     hidden_badges: ["Verified surgeon"],
@@ -185,13 +262,14 @@ export async function runReviewWorkflow(onEvent: (event: WorkflowEvent) => void,
 
   onEvent({ id: "audit", status: "running" });
   await wait(820);
-  const audited = audit(normalized);
-  onEvent({ id: "audit", status: "warning", duration: 801, summary: audited.repairs.length ? "Caught price-unit error; identity unresolved" : "Price rule passed; identity unresolved", output: audited });
+  const audited = audit(normalized, sourced);
+  const criticalCount = audited.repairs.length + (audited.duplicate_search.matched_review_id ? 1 : 0) + (audited.policy_checks.pii.status !== "pass" ? 1 : 0);
+  onEvent({ id: "audit", status: "warning", duration: 801, summary: `${criticalCount} critical safeguard${criticalCount === 1 ? "" : "s"}; identity unresolved`, output: audited });
 
   onEvent({ id: "publish", status: "running" });
   await wait(580);
   const gate = publishGate(audited);
-  onEvent({ id: "publish", status: "complete", duration: 557, summary: "Held for human review; nothing auto-published", output: gate });
+  onEvent({ id: "publish", status: "complete", duration: 557, summary: `Fail-closed; routed to ${gate.queues.length} review queue${gate.queues.length === 1 ? "" : "s"}`, output: gate });
 
   return { sourced, normalized, audited, gate };
 }

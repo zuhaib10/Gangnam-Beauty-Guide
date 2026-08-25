@@ -24,7 +24,11 @@ test("server-renders the task-specific review workflow", async () => {
   assert.match(html, /Trust Auditor/);
   assert.match(html, /Publish Gate/);
   assert.match(html, /Editable Korean source/);
-  assert.match(html, /Eye surgery/);
+  assert.match(html, /Unit bug/);
+  assert.match(html, /Near duplicate/);
+  assert.match(html, /Policy risk/);
+  assert.match(html, /At-scale safeguards/);
+  assert.match(html, /Idempotent ingest/);
   assert.match(html, /Edit review/);
   assert.match(html, /Trust audit/);
   assert.doesNotMatch(html, /href="#workflow">Procedures/);
@@ -55,4 +59,24 @@ test("agent chain repairs Korean price units and blocks unsafe publishing", asyn
     events.filter((event) => event.status === "complete" || event.status === "warning").map((event) => event.id),
     ["source", "normalize", "audit", "publish"],
   );
+});
+
+test("duplicate review is quarantined instead of published", async () => {
+  const { reviewExamples, runReviewWorkflow } = await import("../lib/review-workflow.ts");
+  const result = await runReviewWorkflow(() => {}, reviewExamples[2].raw);
+  assert.equal(result.audited.duplicate_search.matched_review_id, "GBG-0198");
+  assert.equal(result.audited.policy_checks.duplicate.status, "quarantine");
+  assert.ok(result.gate.queues.includes("duplicate-quarantine"));
+  assert.equal(result.gate.decision, "hold_for_human");
+});
+
+test("policy-risk review redacts contact data and routes disclosure review", async () => {
+  const { reviewExamples, runReviewWorkflow } = await import("../lib/review-workflow.ts");
+  const result = await runReviewWorkflow(() => {}, reviewExamples[3].raw);
+  assert.doesNotMatch(result.normalized.safe_original_korean, /010-1234-5678/);
+  assert.match(result.normalized.safe_original_korean, /\[CONTACT REDACTED\]/);
+  assert.equal(result.audited.policy_checks.pii.status, "redacted_and_blocked");
+  assert.equal(result.audited.policy_checks.sponsorship.status, "disclosure_review");
+  assert.ok(result.gate.queues.includes("privacy-review"));
+  assert.ok(result.gate.queues.includes("disclosure-review"));
 });

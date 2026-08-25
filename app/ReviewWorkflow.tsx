@@ -65,6 +65,32 @@ export default function ReviewWorkflow() {
   }
 
   const activeEvent = events[selected];
+  const scaleGuards = [
+    {
+      name: "Idempotent ingest",
+      status: !result ? "Armed" : result.audited.duplicate_search.matched_review_id ? "Quarantine" : "Locked",
+      tone: result?.audited.duplicate_search.matched_review_id ? "danger" : result ? "ok" : "idle",
+      detail: "URL + SHA key makes at-least-once retries safe.",
+    },
+    {
+      name: "Entity threshold",
+      status: !result ? "0.85 gate" : result.audited.entity_resolution.clinic === "resolved" && result.audited.entity_resolution.surgeon === "verified" ? "Passed" : "Human",
+      tone: result && (result.audited.entity_resolution.clinic !== "resolved" || result.audited.entity_resolution.surgeon !== "verified") ? "warn" : result ? "ok" : "idle",
+      detail: "Ambiguous clinics and surgeons are never guessed.",
+    },
+    {
+      name: "Deterministic audit",
+      status: !result ? "Armed" : result.audited.repairs.length || result.audited.policy_checks.pii.status !== "pass" ? "Repaired" : "Passed",
+      tone: result && (result.audited.repairs.length > 0 || result.audited.policy_checks.pii.status !== "pass") ? "warn" : result ? "ok" : "idle",
+      detail: "Units, duplicates and PII run outside the model.",
+    },
+    {
+      name: "Fail-closed publish",
+      status: !result ? "Default hold" : result.gate.decision === "publish" ? "Released" : `${result.gate.queues.length} queues`,
+      tone: result?.gate.decision === "hold_for_human" ? "danger" : result ? "ok" : "idle",
+      detail: "Versioned contracts route risk to owned queues.",
+    },
+  ];
 
   return (
     <main>
@@ -129,6 +155,13 @@ export default function ReviewWorkflow() {
             })}
           </div>
 
+          <section className="scale-controls" aria-label="At-scale safeguards">
+            <div className="scale-heading"><span>At-scale safeguards</span><small>Why retries and model errors cannot silently become public claims</small></div>
+            <div className="guard-grid">
+              {scaleGuards.map((guard) => <div className="guard" key={guard.name}><div><strong>{guard.name}</strong><span className={guard.tone}>{guard.status}</span></div><p>{guard.detail}</p></div>)}
+            </div>
+          </section>
+
           <div className="detail-grid">
             <section className="trace-card" id="handoff-inspector">
               <div className="card-heading"><div><span className="eyebrow">Selected handoff</span><h3>{stepMeta.find((step) => step.id === selected)?.name}</h3></div><span className={`contract-state ${activeEvent.status}`}>{activeEvent.status}</span></div>
@@ -146,7 +179,7 @@ export default function ReviewWorkflow() {
                 <>
                   <div className="result-top"><span className="hold-badge">Human review required</span><span className="score">{result?.audited.trust_score ?? 0}<small>/100 trust</small></span></div>
                   <div className="review-title"><div><span>Likely clinic</span><h3>{result?.normalized.clinic_candidates[0]?.name ?? "Clinic unresolved"} <b>?</b></h3></div><span className="procedure-chip">{result?.normalized.procedure.label ?? "Procedure unresolved"}</span></div>
-                  <p className="translated">{showOriginal ? result?.sourced.original_korean : result?.normalized.translated_review}</p>
+                  <p className="translated">{showOriginal ? result?.normalized.safe_original_korean : result?.normalized.translated_review}</p>
                   <button className="language-toggle" type="button" onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? "Read English translation" : "See original Korean"}</button>
                   {result?.audited.repairs.length ? <div className="repair-alert"><span>!</span><div><strong>Validator caught a price-unit error</strong><small>₩{Number(result.normalized.price_candidate_krw).toLocaleString()} → ₩{Number(result.audited.corrected_price_krw).toLocaleString()} · raw span “{result.normalized.price_source_span}” preserved</small></div></div> : <div className="validation-note"><b>✓</b><span>Price validator passed · {result?.normalized.price_source_span ?? "no price span detected"}</span></div>}
                   <div className="trust-facts"><span><b>✓</b> Source fingerprinted</span><span className={result?.normalized.procedure.taxonomy_id ? "" : "muted"}><b>{result?.normalized.procedure.taxonomy_id ? "✓" : "?"}</b> Procedure {result?.normalized.procedure.taxonomy_id ? "evidenced" : "unresolved"}</span><span className="muted"><b>?</b> Surgeon unverified</span></div>
