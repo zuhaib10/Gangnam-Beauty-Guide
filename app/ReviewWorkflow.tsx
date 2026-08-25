@@ -119,6 +119,7 @@ export default function ReviewWorkflow() {
               const event = events[step.id];
               return (
                 <button className={`step ${selected === step.id ? "active" : ""} ${event.status}`} key={step.id} onClick={() => setSelected(step.id)} type="button">
+                  <span className="flow-pulse" aria-hidden="true" />
                   <div className="step-number">{event.status === "complete" ? "✓" : event.status === "warning" ? "!" : step.number}</div>
                   <div className="step-copy"><strong>{step.name}</strong><span>{event.summary || step.detail}</span></div>
                   <div className="step-tool">{step.tool}</div>
