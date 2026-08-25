@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
 import { incomingReview, runReviewWorkflow, type StepId, type WorkflowEvent } from "../lib/review-workflow";
 
 const stepMeta: Array<{ id: StepId; number: string; name: string; detail: string; tool: string }> = [
@@ -44,15 +43,15 @@ export default function ReviewWorkflow() {
   return (
     <main>
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="Gangnam Beauty Guide home"><span className="brand-mark">G</span><span>Gangnam Beauty Guide</span></a>
-        <div className="lab-title"><span>Agent Lab</span><i />Review Passport</div>
-        <div className="header-actions"><span className="live-dot" />Replayable demo <button type="button" onClick={() => window.location.reload()}>Reset run</button></div>
+        <a className="brand" href="#top" aria-label="Gangnam Beauty Guide home"><span>gangnam beauty guide<b>.</b></span></a>
+        <nav className="main-nav" aria-label="Primary navigation"><a href="#workflow">Procedures</a><a href="#workflow">Find a clinic</a><a href="#workflow">Reviews</a><a href="#workflow">Safety</a></nav>
+        <div className="header-actions"><span className="live-dot" />Agent Lab <button type="button" onClick={() => window.location.reload()}>Reset</button></div>
       </header>
 
       <section className="workspace" id="top">
         <aside className="source-panel">
-          <div className="eyebrow">Incoming review · #{incomingReview.id}</div>
-          <h1>Trust is a chain of evidence.</h1>
+          <div className="eyebrow">Review passport · #{incomingReview.id}</div>
+          <h1>TRUST IS A CHAIN OF EVIDENCE.</h1>
           <p className="intro">Translate Korean reviews without laundering uncertainty. Each agent hands typed evidence—not prose—to the next.</p>
 
           <div className="source-card">
@@ -60,7 +59,7 @@ export default function ReviewWorkflow() {
               <span className="source-logo">N</span><div><strong>Naver Café</strong><small>여우야 · captured 4 days ago</small></div><span className="ko-pill">KO</span>
             </div>
             <div className="source-visual">
-              <Image src="/gangnam-evidence.webp" alt="Rain-lit Gangnam clinic street with archived review papers behind glass" fill sizes="(max-width: 900px) 100vw, 40vw" priority />
+              <div className="source-image" role="img" aria-label="Rain-lit Gangnam clinic street with archived review papers behind glass" />
               <span>Archived context · Gangnam, Seoul</span>
             </div>
             <blockquote>{incomingReview.raw}</blockquote>
@@ -75,7 +74,7 @@ export default function ReviewWorkflow() {
           <div className="principles"><span>Source-bound</span><span>Repair-logged</span><span>Human-gated</span></div>
         </aside>
 
-        <section className="pipeline-panel" aria-label="Review processing workflow">
+        <section className="pipeline-panel" id="workflow" aria-label="Review processing workflow">
           <div className="pipeline-heading">
             <div><span className="eyebrow">Live workflow trace</span><h2>Evidence before eloquence</h2></div>
             <span className={`status-pill ${finished ? "held" : running ? "running" : ""}`}>{finished ? "Held · needs review" : running ? "Agents working" : "Ready to run"}</span>

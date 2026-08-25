@@ -18,7 +18,7 @@ test("server-renders the task-specific review workflow", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /Review Passport/);
-  assert.match(html, /Trust is a chain of evidence/);
+  assert.match(html, /TRUST IS A CHAIN OF EVIDENCE/);
   assert.match(html, /Run 4-step workflow/);
   assert.match(html, /Source Scout/);
   assert.match(html, /Trust Auditor/);
