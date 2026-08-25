@@ -24,7 +24,7 @@ button:disabled { cursor: wait; }
 .brand { color: var(--ink); text-decoration: none; font-family: var(--font-poppins), Arial, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: -.45px; text-transform: lowercase; }
 .brand b { color: var(--rose); font-size: 18px; }
 .main-nav { display: flex; align-items: center; gap: 25px; }
-.main-nav button { position: relative; padding: 21px 0 19px; border: 0; background: transparent; color: #333; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .45px; }
+.main-nav button { position: relative; height: 60px; padding: 0; display: flex; align-items: center; border: 0; background: transparent; color: #333; font-size: 10px; font-weight: 700; line-height: 1; text-transform: uppercase; letter-spacing: .45px; }
 .main-nav button::after { content: ""; position: absolute; right: 0; bottom: 0; left: 0; height: 3px; background: var(--rose); transform: scaleX(0); transition: transform .16s ease; }
 .main-nav button:hover, .main-nav button.active { color: var(--rose-dark); }
 .main-nav button.active::after { transform: scaleX(1); }
