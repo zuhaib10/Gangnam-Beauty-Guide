@@ -177,8 +177,8 @@ h1 { max-width: 590px; margin: 12px 0 9px; font-family: var(--font-poppins), Ari
 .pipeline-footer { margin-top: 7px; padding: 6px 3px 0; display: flex; justify-content: space-between; color: var(--muted); font-size: 7px; text-transform: uppercase; letter-spacing: .7px; }
 
 @media (min-width: 901px) {
-  .workspace { height: calc(100svh - 60px); overflow: hidden; }
-  .source-panel, .pipeline-panel { height: 100%; overflow: hidden; }
+  .workspace { min-height: calc(100svh - 60px); height: auto; overflow: visible; align-items: stretch; }
+  .source-panel, .pipeline-panel { min-height: calc(100svh - 60px); height: auto; overflow: visible; }
 }
 
 @media (max-width: 900px) {
