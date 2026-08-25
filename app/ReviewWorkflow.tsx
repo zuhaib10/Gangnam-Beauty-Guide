@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import { incomingReview, runReviewWorkflow, type StepId, type WorkflowEvent } from "../lib/review-workflow";
 
 const stepMeta: Array<{ id: StepId; number: string; name: string; detail: string; tool: string }> = [
@@ -57,6 +58,10 @@ export default function ReviewWorkflow() {
           <div className="source-card">
             <div className="source-meta">
               <span className="source-logo">N</span><div><strong>Naver Café</strong><small>여우야 · captured 4 days ago</small></div><span className="ko-pill">KO</span>
+            </div>
+            <div className="source-visual">
+              <Image src="/gangnam-evidence.webp" alt="Rain-lit Gangnam clinic street with archived review papers behind glass" fill sizes="(max-width: 900px) 100vw, 40vw" priority />
+              <span>Archived context · Gangnam, Seoul</span>
             </div>
             <blockquote>{incomingReview.raw}</blockquote>
             <div className="source-foot"><span>↗ Archived source</span><span>SHA {incomingReview.snapshotSha.slice(0, 4)}…{incomingReview.snapshotSha.slice(-3)}</span></div>
