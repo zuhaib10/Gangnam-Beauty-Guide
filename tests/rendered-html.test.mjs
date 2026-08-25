@@ -23,7 +23,21 @@ test("server-renders the task-specific review workflow", async () => {
   assert.match(html, /Source Scout/);
   assert.match(html, /Trust Auditor/);
   assert.match(html, /Publish Gate/);
+  assert.match(html, /Editable Korean source/);
+  assert.match(html, /Eye surgery/);
+  assert.doesNotMatch(html, /Review passport · #GBG-0241/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/);
+});
+
+test("edited Korean input flows through extraction and price validation", async () => {
+  const { runReviewWorkflow } = await import("../lib/review-workflow.ts");
+  const custom = "서울피부과에서 레이저 했어요. 45만원 들었고 회복은 3일 정도였어요.";
+  const result = await runReviewWorkflow(() => {}, custom);
+  assert.equal(result.sourced.original_korean, custom);
+  assert.equal(result.sourced.evidence_spans.clinic, "서울피부과");
+  assert.equal(result.normalized.procedure.taxonomy_id, "skin.laser");
+  assert.equal(result.audited.corrected_price_krw, 450_000);
+  assert.equal(result.gate.decision, "hold_for_human");
 });
 
 test("agent chain repairs Korean price units and blocks unsafe publishing", async () => {
